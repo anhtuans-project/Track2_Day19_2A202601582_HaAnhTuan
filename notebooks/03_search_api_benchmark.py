@@ -30,23 +30,34 @@ import httpx
 
 # %%
 ROOT = Path(_setup.__file__).resolve().parent.parent
-proc = subprocess.Popen(
-    ["uvicorn", "app.main:app", "--port", "8000", "--log-level", "warning"],
-    cwd=str(ROOT),
-)
-
-# Đợi server up + warm (Searcher.from_corpus loads embeddings + indexes 1000 docs)
-URL = "http://localhost:8000"
-for _ in range(60):
+URL = "http://localhost:8002"
+# Check if server already running; if not, start it
+def is_server_up(url: str) -> bool:
     try:
-        r = httpx.get(f"{URL}/healthz", timeout=2.0)
-        if r.status_code == 200 and r.json().get("ready"):
-            break
-    except httpx.HTTPError:
-        pass
-    time.sleep(1)
+        r = httpx.get(f"{url}/healthz", timeout=1.0)
+        return r.status_code == 200 and r.json().get("ready")
+    except Exception:
+        return False
+
+proc = None
+if not is_server_up(URL):
+    proc = subprocess.Popen(
+        ["uvicorn", "app.main:app", "--port", "8002", "--log-level", "warning"],
+        cwd=str(ROOT),
+    )
+    # Đợi server up + warm (Searcher.from_corpus loads embeddings + indexes 1000 docs)
+    for _ in range(120):
+        try:
+            r = httpx.get(f"{URL}/healthz", timeout=2.0)
+            if r.status_code == 200 and r.json().get("ready"):
+                break
+        except httpx.HTTPError:
+            pass
+        time.sleep(1)
+    else:
+        raise RuntimeError("API didn't become ready within 120s")
 else:
-    raise RuntimeError("API didn't become ready within 60s")
+    print("Server already running, skipping start.")
 
 print(httpx.get(f"{URL}/healthz").json())
 

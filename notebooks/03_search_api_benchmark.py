@@ -138,9 +138,12 @@ else:
 # ## 5. Cleanup — stop the API server
 
 # %%
-proc.terminate()
-proc.wait(timeout=5)
-print("API server stopped")
+if proc is not None:
+    proc.terminate()
+    proc.wait(timeout=5)
+    print("API server stopped")
+else:
+    print("API server was already running; left running.")
 
 # %% [markdown]
 # ## Deliverable evidence
